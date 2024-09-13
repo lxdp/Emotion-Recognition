@@ -11,6 +11,7 @@ from keras.src.layers.reshaping.flatten import Flatten
 from keras.src.layers.core.dense import Dense
 from keras.callbacks import EarlyStopping
 from keras.models import load_model
+from keras.src.legacy.preprocessing.image import ImageDataGenerator
 
 
 dataset = pdb.read_csv('train.csv')
@@ -48,7 +49,7 @@ emotionListHotEncode = to_categorical(emotionListEncoded)
 
 imageList = np.expand_dims(imageList, axis=-1)
 
-trainImageList, imageListValidation, trainEmotionList, emotionListValidation = train_test_split(imageList, emotionListHotEncode, test_size=0.3, random_state=42)
+trainImageList, imageListValidation, trainEmotionList, emotionListValidation = train_test_split(imageList, emotionListHotEncode, test_size=0.2, random_state=42)
 
 
 model = Sequential([
@@ -62,15 +63,24 @@ model = Sequential([
     Dense(len(labelEncoder.classes_), activation='softmax')
 ])
 
+dataaug = ImageDataGenerator(
+    rotation_range=20,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.15,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    fill_mode='nearest'
+)
+
 model.compile(optimizer='adam',
               loss='categorical_crossentropy',
               metrics=['accuracy'])
 
 earlyStop = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
 
-history = model.fit(trainImageList, trainEmotionList, 
-                    epochs=20, 
-                    batch_size=64, 
+history = model.fit(dataaug.flow(trainImageList, trainEmotionList, batch_size=32),
+                    epochs=40, 
                     validation_data=(imageListValidation, emotionListValidation),
                     callbacks=[earlyStop],
                     verbose=1)
@@ -84,5 +94,3 @@ model = load_model('emotionRecognitionModel.keras')
 
 predictions = model.predict(trainImageList)
 predictedClasses = np.argmax(predictions, axis=1)
-    
-print(imageDictionary['angry'].shape)
