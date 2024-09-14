@@ -12,6 +12,9 @@ from keras.src.layers.core.dense import Dense
 from keras.callbacks import EarlyStopping
 from keras.models import load_model
 from keras.src.legacy.preprocessing.image import ImageDataGenerator
+from keras.src.layers.normalization.batch_normalization import BatchNormalization
+from keras.layers import Dropout
+from keras.optimizers import Adam
 
 
 dataset = pdb.read_csv('train.csv')
@@ -54,32 +57,40 @@ trainImageList, imageListValidation, trainEmotionList, emotionListValidation = t
 
 model = Sequential([
     Conv2D(32, (3, 3), activation='relu', input_shape=(48, 48, 1)),
+    BatchNormalization(),
     MaxPooling2D((2,2)),
     Conv2D(64, (3, 3), activation='relu'),
+    BatchNormalization(),
     MaxPooling2D((2, 2)),
-    Conv2D(64, (3, 3), activation='relu'),
+    Conv2D(128, (3, 3), activation='relu'),
+    BatchNormalization(),
+    MaxPooling2D((2, 2)),
+    Conv2D(128, (3, 3), activation='relu'),
+    BatchNormalization(),
     Flatten(),
-    Dense(64, activation='relu'),
+    Dense(128, activation='relu'),
+    Dropout(0.5),
     Dense(len(labelEncoder.classes_), activation='softmax')
 ])
 
-dataaug = ImageDataGenerator(
-    rotation_range=20,
-    width_shift_range=0.2,
-    height_shift_range=0.2,
-    shear_range=0.15,
-    zoom_range=0.2,
-    horizontal_flip=True,
-    fill_mode='nearest'
-)
+# dataaug = ImageDataGenerator(
+#     rotation_range=10,
+#     width_shift_range=0.1,
+#     height_shift_range=0.1,
+#     shear_range=0.1,
+#     zoom_range=0.1,
+#     horizontal_flip=True,
+#     fill_mode='nearest'
+# )
 
-model.compile(optimizer='adam',
+model.compile(optimizer=Adam(learning_rate=0.0001),
               loss='categorical_crossentropy',
               metrics=['accuracy'])
 
-earlyStop = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
+earlyStop = EarlyStopping(monitor='val_accuracy', patience=5, restore_best_weights=True)
 
-history = model.fit(dataaug.flow(trainImageList, trainEmotionList, batch_size=32),
+history = model.fit(trainImageList, trainEmotionList,
+                    batch_size=16,
                     epochs=40, 
                     validation_data=(imageListValidation, emotionListValidation),
                     callbacks=[earlyStop],
