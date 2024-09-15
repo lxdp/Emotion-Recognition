@@ -1,6 +1,6 @@
-from PIL import Image
 import pandas as pdb
 import numpy as np
+from PIL import Image
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from keras.utils import to_categorical
@@ -11,12 +11,36 @@ from keras.src.layers.reshaping.flatten import Flatten
 from keras.src.layers.core.dense import Dense
 from keras.callbacks import EarlyStopping
 from keras.models import load_model
-from keras.src.legacy.preprocessing.image import ImageDataGenerator
 from keras.src.layers.normalization.batch_normalization import BatchNormalization
 from keras.layers import Dropout
 from keras.optimizers import Adam
+import cv2
+import time
 
 
+camera = cv2.VideoCapture(1)
+
+
+if not camera.isOpened():
+    print("Camera is not working")
+    exit()
+    
+while True:
+    ret, frame = camera.read()
+    
+    if not ret:
+        print("Can not recieve frame. Exiting")
+        break
+    
+    cv2.imshow('Camera', frame)
+    
+    if cv2.waitKey(1) == ord('q'):
+        break
+
+camera.release()
+cv2.destroyAllWindows()
+
+    
 dataset = pdb.read_csv('train.csv')
 
 emotions = {0: 'angry', 1: 'disgust', 2: 'fear', 3: 'happy', 4: 'sad', 5: 'suprise', 6: 'neutral'}
@@ -72,16 +96,6 @@ model = Sequential([
     Dropout(0.5),
     Dense(len(labelEncoder.classes_), activation='softmax')
 ])
-
-# dataaug = ImageDataGenerator(
-#     rotation_range=10,
-#     width_shift_range=0.1,
-#     height_shift_range=0.1,
-#     shear_range=0.1,
-#     zoom_range=0.1,
-#     horizontal_flip=True,
-#     fill_mode='nearest'
-# )
 
 model.compile(optimizer=Adam(learning_rate=0.0001),
               loss='categorical_crossentropy',
