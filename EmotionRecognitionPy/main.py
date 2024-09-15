@@ -17,13 +17,32 @@ from keras.optimizers import Adam
 import cv2
 import time
 
+model = load_model('emotionRecognitionModel.keras')
 
-camera = cv2.VideoCapture(1)
+
+camera = cv2.VideoCapture(0)
+
+emotions = {0: 'angry', 1: 'disgust', 2: 'fear', 3: 'happy', 4: 'sad', 5: 'suprise', 6: 'neutral'}
+imageList = []
+emotionList = []
+
 
 
 if not camera.isOpened():
     print("Camera is not working")
     exit()
+    
+def processFace(face):
+    greyscaleFace = cv2.cvtColor(face, cv2.COLOR_BGR2GRAY)
+    resize = cv2.resize(greyscaleFace, (48,48))
+    faceNormalisation = resize/ 255.0
+    reshape = np.reshape(faceNormalisation, (1, 48, 48, 1))
+    return reshape
+    
+def prediction(model, array):
+    predictions = model.predict(array)
+    predictedClasses = np.argmax(predictions, axis=1)
+    return predictedClasses
     
 while True:
     ret, frame = camera.read()
@@ -31,6 +50,14 @@ while True:
     if not ret:
         print("Can not recieve frame. Exiting")
         break
+    
+    imageArray = processFace(frame)
+    
+    index = prediction(model, imageArray)
+    
+    emotion = emotions.get(index[0], 'unclear')
+    
+    cv2.putText(frame, f'Emotion: {emotion}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
     
     cv2.imshow('Camera', frame)
     
@@ -42,10 +69,6 @@ cv2.destroyAllWindows()
 
     
 dataset = pdb.read_csv('train.csv')
-
-emotions = {0: 'angry', 1: 'disgust', 2: 'fear', 3: 'happy', 4: 'sad', 5: 'suprise', 6: 'neutral'}
-imageList = []
-emotionList = []
 
 imageDictionary = {emotion: [] for emotion in emotions.values()}
 
@@ -114,8 +137,3 @@ loss, accuracy = model.evaluate(trainImageList, trainEmotionList, verbose=1)
 print(f'Validation accuracy: {accuracy:.4f}')
 
 model.save('emotionRecognitionModel.keras')
-
-model = load_model('emotionRecognitionModel.keras')
-
-predictions = model.predict(trainImageList)
-predictedClasses = np.argmax(predictions, axis=1)
