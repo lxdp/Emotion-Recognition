@@ -16,6 +16,7 @@ from keras.layers import Dropout
 from keras.optimizers import Adam
 import cv2
 import time
+from keras.src.legacy.preprocessing.image import ImageDataGenerator
 
 model = load_model('emotionRecognitionModel.keras')
 
@@ -31,36 +32,44 @@ emotionList = []
 if not camera.isOpened():
     print("Camera is not working")
     exit()
-    
+
 def processFace(face):
     greyscaleFace = cv2.cvtColor(face, cv2.COLOR_BGR2GRAY)
-    resize = cv2.resize(greyscaleFace, (48,48))
+    sharpenedFace = sharpenImage(greyscaleFace)
+    resize = cv2.resize(sharpenedFace, (48,48))
     faceNormalisation = resize/ 255.0
     reshape = np.reshape(faceNormalisation, (1, 48, 48, 1))
     return reshape
-    
+
 def prediction(model, array):
     predictions = model.predict(array)
     predictedClasses = np.argmax(predictions, axis=1)
     return predictedClasses
-    
+
+def sharpenImage(image):
+    kernel = np.array([[0, -1, 0],
+                       [-1, 5, -1],
+                       [0, -1, 0]], dtype=np.float32)
+    sharpened = cv2.filter2D(image, -1, kernel)
+    return sharpened
+#
 while True:
     ret, frame = camera.read()
-    
+
     if not ret:
         print("Can not recieve frame. Exiting")
         break
-    
+
     imageArray = processFace(frame)
-    
+
     index = prediction(model, imageArray)
-    
+
     emotion = emotions.get(index[0], 'unclear')
-    
+
     cv2.putText(frame, f'Emotion: {emotion}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-    
+
     cv2.imshow('Camera', frame)
-    
+
     if cv2.waitKey(1) == ord('q'):
         break
 
@@ -120,14 +129,24 @@ model = Sequential([
     Dense(len(labelEncoder.classes_), activation='softmax')
 ])
 
+dataaug = ImageDataGenerator(
+    rotation_range=10,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    fill_mode='nearest'
+    
+)
+
 model.compile(optimizer=Adam(learning_rate=0.0001),
               loss='categorical_crossentropy',
               metrics=['accuracy'])
 
 earlyStop = EarlyStopping(monitor='val_accuracy', patience=5, restore_best_weights=True)
 
-history = model.fit(trainImageList, trainEmotionList,
-                    batch_size=16,
+history = model.fit(dataaug.flow(trainImageList, trainEmotionList, batch_size=16),
                     epochs=40, 
                     validation_data=(imageListValidation, emotionListValidation),
                     callbacks=[earlyStop],
