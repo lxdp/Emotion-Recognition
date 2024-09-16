@@ -17,6 +17,8 @@ from keras.optimizers import Adam
 import cv2
 import time
 from keras.src.legacy.preprocessing.image import ImageDataGenerator
+from scipy.signal._wavelets import cascade
+from pickle import NONE
 
 model = load_model('emotionRecognitionModel.keras')
 
@@ -27,6 +29,8 @@ emotions = {0: 'angry', 1: 'disgust', 2: 'fear', 3: 'happy', 4: 'sad', 5: 'supri
 imageList = []
 emotionList = []
 
+cascadeFace = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
 
 
 if not camera.isOpened():
@@ -34,7 +38,16 @@ if not camera.isOpened():
     exit()
 
 def processFace(face):
-    greyscaleFace = cv2.cvtColor(face, cv2.COLOR_BGR2GRAY)
+    greyFrame = cv2.cvtColor(face, cv2.COLOR_BGR2GRAY)
+    faceDetection = cascadeFace.detectMultiScale(greyFrame, scaleFactor = 1.1, minNeighbors=5, minSize=(30,30))
+    
+    if len(faceDetection) == 0:
+        print("No face detected")
+        return None
+    
+    (x, y, w, h) = faceDetection[0]
+    faces = face[y:y+h, x:x+w]
+    greyscaleFace = cv2.cvtColor(faces, cv2.COLOR_BGR2GRAY)
     sharpenedFace = sharpenImage(greyscaleFace)
     resize = cv2.resize(sharpenedFace, (48,48))
     faceNormalisation = resize/ 255.0
@@ -61,12 +74,13 @@ while True:
         break
 
     imageArray = processFace(frame)
-
-    index = prediction(model, imageArray)
-
-    emotion = emotions.get(index[0], 'unclear')
-
-    cv2.putText(frame, f'Emotion: {emotion}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    
+    if imageArray is not None:
+        index = prediction(model, imageArray)
+    
+        emotion = emotions.get(index[0], 'unclear')
+    
+        cv2.putText(frame, f'Emotion: {emotion}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
     cv2.imshow('Camera', frame)
 
